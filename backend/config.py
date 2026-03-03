@@ -16,6 +16,8 @@ class Settings(BaseSettings):
     DB_HOST: str = "localhost"
     DB_PORT: int = 3306
     DB_NAME: str
+    GCS_BUCKET_NAME: str = "agentic-marketing-pages"
+    TINYURL_API_KEY: str
 
     model_config = {"env_file": ".env"}
 

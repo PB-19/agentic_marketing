@@ -4,20 +4,32 @@ import uuid
 from google.adk.agents import Agent
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
-from google.adk.tools import google_search
+from google.adk.tools import google_search, FunctionTool
+from google.adk.tools.agent_tool import AgentTool
 from google.genai import types
 from backend.schemas.research import IdeaRequest, ResearchResult
 from backend.config import settings
 from backend.logger import get_logger
+from backend.tools.search_tools import url_fetch
 
 logger = get_logger(__name__)
+
+# Sub-agent: isolates the built-in google_search tool so it can coexist
+# with custom FunctionTools on the parent agent (ADK limitation workaround).
+_search_sub_agent = Agent(
+    name="SearchSubAgent",
+    model=settings.GOOGLE_GENAI_MODEL,
+    instruction="Perform web searches using google_search and return the results as-is.",
+    tools=[google_search],
+)
 
 _INSTRUCTION = """You are a market research expert. For the given product/project idea:
 1. Classify the primary domain and up to 3 secondary domains
 2. Assess novelty — verdict must be one of: Novel, Competitive entry, Hybrid
-3. Use google_search with 3–5 targeted queries max to research competitors
-4. List 3–5 top competitors with their strengths, weaknesses, and positioning
-5. Derive actionable marketing implications
+3. Use SearchSubAgent with 3–5 targeted queries max to research competitors
+4. If a reference URL is provided or a competitor URL is found, use url_fetch to get deeper details
+5. List 3–5 top competitors with their strengths, weaknesses, and positioning
+6. Derive actionable marketing implications
 
 Respond ONLY with valid JSON — no markdown, no explanation:
 {
@@ -33,7 +45,7 @@ research_agent = Agent(
     name="IdeaResearcherAgent",
     model=settings.GOOGLE_GENAI_MODEL,
     instruction=_INSTRUCTION,
-    tools=[google_search],
+    tools=[AgentTool(agent=_search_sub_agent), FunctionTool(url_fetch)],
 )
 
 _session_service = InMemorySessionService()
