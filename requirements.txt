@@ -1,0 +1,14 @@
+fastapi
+pydantic
+pydantic-settings
+uvicorn
+python-multipart
+sqlalchemy
+aiomysql
+httpx
+requests
+passlib[bcrypt]
+python-jose[cryptography]
+bcrypt==4.0.1
+python-dotenv
+google-adk
