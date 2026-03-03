@@ -11,6 +11,7 @@ from backend.schemas.research import IdeaRequest, ResearchResult
 from backend.config import settings
 from backend.logger import get_logger
 from backend.tools.search_tools import url_fetch
+from backend.agents.event_logger import log_agent_event
 
 logger = get_logger(__name__)
 
@@ -73,6 +74,7 @@ async def run_research(request: IdeaRequest) -> ResearchResult:
 
     logger.info(f"Running research agent for: '{request.idea[:60]}'")
     async for event in runner.run_async(user_id="system", session_id=session.id, new_message=message):
+        log_agent_event(event, logger)
         if event.is_final_response() and event.content:
             for part in event.content.parts:
                 if hasattr(part, "text") and part.text:

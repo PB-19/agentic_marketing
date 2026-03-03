@@ -13,6 +13,7 @@ from backend.agents.webpage_designer_agent import run_webpage_revision
 from backend.tools.gcs_tools import gcs_upload, tinyurl_shorten
 from backend.config import settings
 from backend.logger import get_logger
+from backend.agents.event_logger import log_agent_event
 
 logger = get_logger(__name__)
 
@@ -62,7 +63,10 @@ _reviewer_agent = Agent(
 
 
 def _build_review_prompt(html: str, request: WebpageRequest, iteration: int) -> str:
-    lines = [f"## Review Request — Iteration {iteration} of {_MAX_ITERATIONS}"]
+    lines = [
+        f"## Review Request — Iteration {iteration} of {_MAX_ITERATIONS}",
+        f"**Product idea**: {request.idea}",
+    ]
 
     if request.reference_url:
         lines.append(f"**Reference URL**: {request.reference_url}")
@@ -91,6 +95,7 @@ async def _run_review(html: str, request: WebpageRequest, iteration: int) -> _Re
     response_text = ""
 
     async for event in runner.run_async(user_id="system", session_id=session.id, new_message=message):
+        log_agent_event(event, logger)
         if event.is_final_response() and event.content:
             for part in event.content.parts:
                 if hasattr(part, "text") and part.text:

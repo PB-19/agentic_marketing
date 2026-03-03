@@ -6,3 +6,4 @@ credentials.json
 
 documentation/
 **/storage/*
+backend/logs/

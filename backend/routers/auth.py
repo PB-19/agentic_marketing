@@ -5,9 +5,11 @@ from sqlalchemy import select
 from passlib.context import CryptContext
 from backend.database import get_db
 from backend.models.user import User
+from backend.models.event_log import EventType
 from backend.schemas.auth import Token, UserOut
 from backend.auth.jwt_handler import create_access_token
 from backend.auth.dependencies import get_current_user
+from backend.services.event_service import log_event
 from backend.logger import get_logger
 
 logger = get_logger(__name__)
@@ -21,9 +23,11 @@ async def login(form: OAuth2PasswordRequestForm = Depends(), db: AsyncSession = 
     user = result.scalar_one_or_none()
     if not user or not pwd_ctx.verify(form.password, user.hashed_password):
         logger.warning(f"Failed login attempt: {form.username}")
+        await log_event(db, EventType.LOGIN_FAILED, metadata={"attempted_username": form.username})
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect credentials")
     token = create_access_token({"sub": user.username})
     logger.info(f"Login successful: {user.username}")
+    await log_event(db, EventType.LOGIN_SUCCESS, user_id=user.id)
     return Token(access_token=token, token_type="bearer")
 
 

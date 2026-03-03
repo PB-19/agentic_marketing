@@ -3,6 +3,7 @@ from backend.schemas.research import ResearchResult
 
 
 class WebpageRequest(BaseModel):
+    idea: str
     research: ResearchResult
     reference_url: str | None = None
     text_preferences: str | None = None

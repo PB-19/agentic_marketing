@@ -5,7 +5,9 @@ load_dotenv()  # Must run before any module that reads env vars
 
 from fastapi import FastAPI
 from backend.database import engine, Base
-from backend.models import user as _user_models  # noqa: F401 — registers User with Base.metadata
+from backend.models import user as _user_models          # noqa: F401 — registers models with Base.metadata
+from backend.models import event_log as _event_log_models  # noqa: F401
+from backend.models import idea_analytics as _analytics_models  # noqa: F401
 from backend.routers.auth import router as auth_router
 from backend.routers.research import router as research_router
 from backend.routers.webpage import router as webpage_router

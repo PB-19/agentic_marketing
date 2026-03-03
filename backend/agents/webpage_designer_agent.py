@@ -9,12 +9,13 @@ from backend.schemas.webpage import WebpageRequest, WebpageResult
 from backend.config import settings
 from backend.logger import get_logger
 from backend.tools.search_tools import url_fetch
+from backend.agents.event_logger import log_agent_event
 
 logger = get_logger(__name__)
 
 _INSTRUCTION = """You are a senior frontend designer specializing in Material Design 3 static landing pages.
 
-Given a research summary and optional user preferences, you will:
+Given a product idea, research summary, and optional user preferences, you will:
 1. Build a design plan (color palette, typography, layout sections, component style, tone)
 2. If a reference URL is provided, use url_fetch to extract design inspiration from it
 3. Incorporate any user text preferences
@@ -53,8 +54,11 @@ _session_service = InMemorySessionService()
 def _build_prompt(request: WebpageRequest) -> str:
     r = request.research
     lines = [
+        f"## Product Idea",
+        f"{request.idea}",
+        "",
         f"## Research Summary",
-        f"**Idea domain**: {r.domain_primary} | Secondary: {', '.join(r.domain_secondary)}",
+        f"**Domain**: {r.domain_primary} | Secondary: {', '.join(r.domain_secondary)}",
         f"**Novelty**: {r.novelty_verdict}",
         f"**Differentiating aspects**: {', '.join(r.differentiating_aspects)}",
         f"**Marketing implications**: {', '.join(r.marketing_implications)}",
@@ -73,7 +77,7 @@ def _build_prompt(request: WebpageRequest) -> str:
     return "\n".join(lines)
 
 
-async def run_webpage_design(request: WebpageRequest) -> WebpageResult:
+async def _run_agent(prompt: str, log_prefix: str) -> str:
     session_id = str(uuid.uuid4())
     session = await _session_service.create_session(
         app_name="agentic_marketing",
@@ -85,42 +89,33 @@ async def run_webpage_design(request: WebpageRequest) -> WebpageResult:
         app_name="agentic_marketing",
         session_service=_session_service,
     )
-
-    prompt = _build_prompt(request)
     message = types.Content(role="user", parts=[types.Part(text=prompt)])
     response_text = ""
 
-    logger.info("Running WebpageDesignerAgent")
+    logger.info(f"WebpageDesignerAgent: {log_prefix}")
     async for event in runner.run_async(user_id="system", session_id=session.id, new_message=message):
+        log_agent_event(event, logger)
         if event.is_final_response() and event.content:
             for part in event.content.parts:
                 if hasattr(part, "text") and part.text:
                     response_text += part.text
 
-    # Strip markdown code fences if the model wraps HTML in them
     html = re.sub(r"^```(?:html)?\s*", "", response_text.strip())
     html = re.sub(r"\s*```$", "", html).strip()
+    logger.info(f"WebpageDesignerAgent: {log_prefix} → {len(html)} chars")
+    return html
 
-    logger.info(f"WebpageDesignerAgent produced {len(html)} chars of HTML")
+
+async def run_webpage_design(request: WebpageRequest) -> WebpageResult:
+    html = await _run_agent(_build_prompt(request), "initial design")
     return WebpageResult(html=html)
 
 
 async def run_webpage_revision(current_html: str, issues: list[str], request: WebpageRequest) -> WebpageResult:
     """Re-run the designer with specific reviewer feedback to produce a revised HTML."""
-    session_id = str(uuid.uuid4())
-    session = await _session_service.create_session(
-        app_name="agentic_marketing",
-        user_id="system",
-        session_id=session_id,
-    )
-    runner = Runner(
-        agent=_webpage_designer_agent,
-        app_name="agentic_marketing",
-        session_service=_session_service,
-    )
-
     issue_list = "\n".join(f"- {issue}" for issue in issues)
     prompt = (
+        f"## Product Idea\n{request.idea}\n\n"
         f"You previously generated the HTML below. A reviewer has requested the following changes:\n\n"
         f"{issue_list}\n\n"
         f"Original user preferences: {request.text_preferences or 'None'}\n\n"
@@ -128,18 +123,5 @@ async def run_webpage_revision(current_html: str, issues: list[str], request: We
         f"Return ONLY the corrected HTML file with the design plan comment at the top.\n\n"
         f"## Current HTML\n{current_html}"
     )
-    message = types.Content(role="user", parts=[types.Part(text=prompt)])
-    response_text = ""
-
-    logger.info(f"Running WebpageDesignerAgent revision ({len(issues)} issues to fix)")
-    async for event in runner.run_async(user_id="system", session_id=session.id, new_message=message):
-        if event.is_final_response() and event.content:
-            for part in event.content.parts:
-                if hasattr(part, "text") and part.text:
-                    response_text += part.text
-
-    html = re.sub(r"^```(?:html)?\s*", "", response_text.strip())
-    html = re.sub(r"\s*```$", "", html).strip()
-
-    logger.info(f"WebpageDesignerAgent revision produced {len(html)} chars of HTML")
+    html = await _run_agent(prompt, f"revision ({len(issues)} issues)")
     return WebpageResult(html=html)
