@@ -1,7 +1,11 @@
 .venv/
 __pycache__/
+*/node_modules
+*/.next
+*/package-lock.json
 .claude/
-.env
+*.env
+*.env.local
 credentials.json
 
 documentation/

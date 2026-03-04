@@ -15,3 +15,8 @@ class UserOut(BaseModel):
     username: str
 
     model_config = {"from_attributes": True}
+
+
+class RegisterRequest(BaseModel):
+    username: str
+    password: str
