@@ -12,3 +12,7 @@ python-jose[cryptography]
 bcrypt==4.0.1
 python-dotenv
 google-adk
+pymupdf
+instagrapi
+pillow
+vertexai

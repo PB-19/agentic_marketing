@@ -11,6 +11,7 @@ from backend.models import idea_analytics as _analytics_models  # noqa: F401
 from backend.routers.auth import router as auth_router
 from backend.routers.research import router as research_router
 from backend.routers.webpage import router as webpage_router
+from backend.routers.instagram import router as instagram_router
 from backend.logger import get_logger
 
 logger = get_logger(__name__)
@@ -31,3 +32,4 @@ app = FastAPI(title="Agentic Marketing API", lifespan=lifespan)
 app.include_router(auth_router)
 app.include_router(research_router)
 app.include_router(webpage_router)
+app.include_router(instagram_router)

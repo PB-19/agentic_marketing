@@ -121,16 +121,20 @@ def _save_local(html: str) -> None:
     logger.info(f"Saved finalized HTML locally: {path}")
 
 
-async def run_design_review_loop(request: WebpageRequest) -> DeployResult:
+async def run_design_review_loop(
+    request: WebpageRequest,
+    reference_parts: list | None = None,
+) -> DeployResult:
     """
     Orchestrates the designer → reviewer loop with a hard cap of _MAX_ITERATIONS (3).
     The loop is controlled entirely in Python — the agents never drive iteration themselves.
+    reference_parts are re-sent on every designer call so the visual constraint is maintained.
     """
-    from backend.agents.webpage_designer_agent import run_webpage_design
+    from backend.agents.webpage_designer_agent import run_webpage_design, run_webpage_revision
 
     # Initial design pass
     logger.info("Design-review loop: starting initial design")
-    result: WebpageResult = await run_webpage_design(request)
+    result: WebpageResult = await run_webpage_design(request, reference_parts)
     html = result.html
 
     for iteration in range(1, _MAX_ITERATIONS + 1):
@@ -160,7 +164,7 @@ async def run_design_review_loop(request: WebpageRequest) -> DeployResult:
 
         # Revision needed — send feedback back to designer
         logger.info(f"Design-review loop: requesting revision after iteration {iteration}")
-        revised: WebpageResult = await run_webpage_revision(html, verdict.issues, request)
+        revised: WebpageResult = await run_webpage_revision(html, verdict.issues, request, reference_parts)
         html = revised.html
 
     # Should never reach here given the approved check above, but guard anyway
